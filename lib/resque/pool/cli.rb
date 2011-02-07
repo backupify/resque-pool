@@ -56,12 +56,7 @@ where [options] are:
         pid = Process.pid
         if pidfile
           if File.exist? pidfile
-            running_pid = `ps ax | awk '{print $1}' | egrep ^#{File.open(pidfile).read.strip}$`
-            if running_pid.nil? || running_pid.to_s.strip == ''
-              File.delete pidfile
-            else
-              raise "Pidfile already exists at #{pidfile}.  Check to make sure process is not already running."
-            end
+            raise "Pidfile already exists at #{pidfile}.  Check to make sure process is not already running."
           end
           File.open pidfile, "w" do |f|
             f.write pid
@@ -84,7 +79,7 @@ where [options] are:
       def setup_environment(opts)
         ENV["RACK_ENV"] = ENV["RAILS_ENV"] = ENV["RESQUE_ENV"] = opts[:environment] if opts[:environment]
         puts "Resque Pool running in #{ENV["RAILS_ENV"] || "development"} environment."
-        ENV["RESQUE_POOL_CONFIG"] = opts[:config].to_s if opts[:config]
+        ENV["RESQUE_POOL_CONFIG"] = opts[:config] if opts[:config]
       end
 
       def start_pool

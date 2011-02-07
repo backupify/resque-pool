@@ -90,8 +90,8 @@ module Resque
     end
 
     def environment
-      if defined? Rails
-        Rails.env
+      if defined? RAILS_ENV
+        RAILS_ENV
       else
         ENV['RACK_ENV'] || ENV['RAILS_ENV'] || ENV['RESQUE_ENV']
       end
@@ -189,7 +189,6 @@ module Resque
         break if handle_sig_queue! == :break
         if sig_queue.empty?
           master_sleep
-          monitor_memory_usage
           maintain_worker_count
         end
         procline("managing #{all_pids.inspect}")
@@ -243,71 +242,14 @@ module Resque
       end
     end
 
-    def monitor_memory_usage
-      #only check every minute
-      if @last_mem_check.nil? || @last_mem_check < Time.now - 60
-        
-        all_pids.each do |pid|
-          smaps_filename = "/proc/#{pid}/smaps"
-          
-          #Grab actual memory usage from proc in MB
-          begin
-            mem_usage = `
-              if [ -f #{smaps_filename} ];
-                then
-                  grep Private_Dirty #{smaps_filename} | awk '{s+=$2} END {printf("%d", s/1000)}'
-                else echo "0"
-              fi
-            `.to_i
-          rescue Errno::EINTR
-            retry
-          end
-
-          if mem_usage > 800
-            log "Terminating worker #{pid} for using #{mem_usage}MB memory"
-            Process.kill :TERM, pid
-          elsif mem_usage > 400
-            log "Gracefully shutting down worker #{pid} for using #{mem_usage}MB memory"
-            Process.kill :QUIT, pid
-          end
-
-        end
-
-        @last_mem_check = Time.now
-      end
-    end
-
-    def orphaned_worker_count
-      if @last_orphaned_check.nil? || @last_orphaned_check < Time.now - 60
-        if @orphaned_pids.nil?
-            printf_line = '%d %d\n'
-          pids_with_parents = `ps -f axf | grep resque | grep -v grep | grep -v resque-web | grep -v master | awk '{printf("%d %d\\n", $2, $3)}'`.split("\n")
-          pids = pids_with_parents.collect {|x| x.split[0].to_i}
-          parents = pids_with_parents.collect {|x| x.split[1].to_i}
-          pids.delete_if {|x| parents.include?(x)}
-          pids.delete_if {|x| all_pids.include?(x)}
-          @orphaned_pids = pids
-        elsif @orphaned_pids.size > 0
-          @orphaned_pids.delete_if do |pid|
-            ps_out = `ps --no-heading p #{pid}`
-            ps_out.nil? || ps_out.strip == ''
-          end
-        end
-        @last_orphaned_check = Time.now
-        log "Current orphaned pids: #{@orphaned_pids}" if @orphaned_pids.size > 0
-      end
-      @orphaned_pids.size
-    end
-
     # }}}
     # ???: maintain_worker_count, all_known_queues {{{
 
     def maintain_worker_count
-      orphaned_offset = orphaned_worker_count / all_known_queues.size
       all_known_queues.each do |queues|
-        delta = worker_delta_for(queues) - orphaned_offset
-        spawn_missing_workers_for(queues, delta) if delta > 0
-        quit_excess_workers_for(queues, delta)   if delta < 0
+        delta = worker_delta_for(queues)
+        spawn_missing_workers_for(queues) if delta > 0
+        quit_excess_workers_for(queues)   if delta < 0
       end
     end
 
@@ -319,18 +261,16 @@ module Resque
     # methods that operate on a single grouping of queues {{{
     # perhaps this means a class is waiting to be extracted
 
-    def spawn_missing_workers_for(queues, delta)
-      delta.times { spawn_worker!(queues) } if delta > 0
+    def spawn_missing_workers_for(queues)
+      worker_delta_for(queues).times do |nr|
+        spawn_worker!(queues)
+      end
     end
 
-    def quit_excess_workers_for(queues, delta)
-      if delta < 0
-        queue_pids = pids_for(queues)
-        if queue_pids.size >= delta.abs
-          queue_pids[0...delta.abs].each {|pid| Process.kill("QUIT", pid)}
-        else
-          queue_pids.each {|pid| Process.kill("QUIT", pid)}
-        end
+    def quit_excess_workers_for(queues)
+      delta = -worker_delta_for(queues)
+      pids_for(queues)[0...delta].each do |pid|
+        Process.kill("QUIT", pid)
       end
     end
 
@@ -349,12 +289,7 @@ module Resque
         call_after_prefork!
         reset_sig_handlers!
         #self_pipe.each {|io| io.close }
-        begin
-          worker.work(ENV['INTERVAL'] || DEFAULT_WORKER_INTERVAL) # interval, will block
-        rescue Errno::EINTR
-          log "Caught interrupted system call Errno::EINTR. Retrying."
-          retry
-        end
+        worker.work(ENV['INTERVAL'] || DEFAULT_WORKER_INTERVAL) # interval, will block
       end
       workers[queues] ||= {}
       workers[queues][pid] = worker
