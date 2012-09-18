@@ -49,7 +49,12 @@ module Resque
     # Config: class methods to start up the pool using the default config {{{
 
     @config_files = ["resque-pool.yml", "config/resque-pool.yml"]
-    class << self; attr_accessor :config_files; end
+
+    class << self
+      attr_accessor :config_files
+      attr_accessor :pool_name
+    end
+
     def self.choose_config_file
       if ENV["RESQUE_POOL_CONFIG"]
         ENV["RESQUE_POOL_CONFIG"]
@@ -89,6 +94,10 @@ module Resque
         @config ||= {}
       end
       environment and @config[environment] and config.merge!(@config[environment])
+
+      pool_name = config.delete('pool_name')
+      Resque::Pool.pool_name = pool_name unless pool_name.nil?
+
       config.delete_if {|key, value| value.is_a? Hash }
     end
 
