@@ -308,7 +308,7 @@ module Resque
       end
 
       @orphaned_checked_time = Time.now.to_i
-      @orphaned_count = workers_on_queues.size - managed_worker_size
+      @orphaned_count = [workers_on_queues.size - managed_worker_size, 0].max
     end
 
     def managed_worker_size
