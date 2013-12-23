@@ -270,6 +270,7 @@ module Resque
     def maintain_worker_count
       all_known_queues.each do |queues|
         delta = worker_delta_for(queues)
+        log "#{Time.now.utc} - maintain_worker_count: delta: #{delta}" if delta != 0
         spawn_missing_workers_for(queues, delta) if delta > 0
         quit_excess_workers_for(queues, delta.abs)   if delta < 0
       end
@@ -284,10 +285,12 @@ module Resque
     # perhaps this means a class is waiting to be extracted
 
     def spawn_missing_workers_for(queues, delta)
+      log "#{Time.now.utc} - spawning #{delta} workers"
       delta.times { spawn_worker!(queues) }
     end
 
     def quit_excess_workers_for(queues, delta)
+      log "#{Time.now.utc} - quitting #{delta} workers"
       pids_for(queues)[0...delta].each do |pid|
         Process.kill("QUIT", pid)
       end
@@ -305,7 +308,7 @@ module Resque
       end
 
       @orphaned_checked_time = Time.now.to_i
-      @orphaned_count = workers_on_queues.size - managed_worker_size
+      @orphaned_count = [workers_on_queues.size - managed_worker_size, 0].max
     end
 
     def managed_worker_size
