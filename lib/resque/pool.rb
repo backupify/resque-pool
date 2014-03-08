@@ -425,7 +425,6 @@ module Resque
       orphaned_offset = orphaned_worker_count / all_known_queues.size
       all_known_queues.each do |queues|
         delta = worker_delta_for(queues) - orphaned_offset
-        log "#{Time.now.utc} - maintain_worker_count: delta: #{delta}, orphanted_worker_count: #{orphaned_worker_count}, all_known_queues_size: #{all_known_queues.size}" if delta != 0
         spawn_missing_workers_for(queues, delta) if delta > 0
         quit_excess_workers_for(queues, delta)   if delta < 0
       end
@@ -440,12 +439,10 @@ module Resque
     # perhaps this means a class is waiting to be extracted
 
     def spawn_missing_workers_for(queues, delta)
-      log "#{Time.now.utc} - spawning #{delta} workers"
       delta.times { spawn_worker!(queues) } if delta > 0
     end
 
     def quit_excess_workers_for(queues, delta)
-      log "#{Time.now.utc} - quitting #{delta} workers"
       if delta < 0
         queue_pids = pids_for(queues)
         if queue_pids.size >= delta.abs
