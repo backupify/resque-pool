@@ -280,7 +280,7 @@ module Resque
 
       #Grab actual memory usage from proc in MB
       begin
-        stdout_str, status = Open3.capture2(cmd)
+        stdout_str, status = ::Open3.capture2(cmd)
         stdout_str.to_i
       rescue Errno::EINTR
         retry
@@ -289,7 +289,7 @@ module Resque
     
     def process_exists?(pid)
       begin
-        ps_line, status = Open3.capture2("ps -p #{pid} --no-header")
+        ps_line, status = ::Open3.capture2("ps -p #{pid} --no-header")
       rescue Errno::EINTR
         retry
       end
@@ -301,7 +301,7 @@ module Resque
       #look for workers that didn't terminate
       @term_workers.delete_if {|pid| !process_exists?(pid)}
       #send the rest a -9
-      @term_workers.each {|pid| Open3.pipeline("kill -9 #{pid}")}
+      @term_workers.each {|pid| ::Open3.pipeline("kill -9 #{pid}")}
     end
 
     def add_killed_worker(pid)
@@ -338,7 +338,7 @@ module Resque
     def hostname
       begin
         unless @hostname
-          @hostname, status = Open3.capture2("hostname")
+          @hostname, status = ::Open3.capture2("hostname")
           @hostname.strip!
         end
         @hostname
@@ -372,7 +372,7 @@ module Resque
 
     def find_child_pid(parent_pid)
       begin
-        stdout, error = Open3.capture2("ps --ppid #{parent_pid} -o pid --no-header")
+        stdout, error = ::Open3.capture2("ps --ppid #{parent_pid} -o pid --no-header")
         p = stdout.to_i
         p == 0 ? nil : p
       rescue Errno::EINTR
@@ -389,7 +389,7 @@ module Resque
 
           begin
             pids_with_parents = []
-            Open3.pipeline_r(*cmds) do |stdout, wait_threads|
+            ::Open3.pipeline_r(*cmds) do |stdout, wait_threads|
               pids_with_parents << stdout.readline while !stdout.eof?
             end
           rescue Errno::EINTR
@@ -405,7 +405,7 @@ module Resque
         elsif @orphaned_pids.size > 0
           @orphaned_pids.delete_if do |pid|
             begin
-              ps_out, status = Open3.capture2("ps --no-heading p #{pid}")
+              ps_out, status = ::Open3.capture2("ps --no-heading p #{pid}")
               ps_out.nil? || ps_out.strip == ''
             rescue Errno::EINTR
               retry
