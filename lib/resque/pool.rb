@@ -5,6 +5,7 @@ require 'resque/pool/logging'
 require 'resque/pool/pooled_worker'
 require 'fcntl'
 require 'yaml'
+require 'open3'
 
 module Resque
   class Pool
