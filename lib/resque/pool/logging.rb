@@ -43,13 +43,13 @@ module Resque
 
       # TODO: make this use an actual logger
       def log(message)
-        puts "resque-pool-manager[#{Process.pid}]: #{message}"
+        puts "[#{Time.now}] resque-pool-manager[#{Process.pid}]: #{message}"
         #$stdout.fsync
       end
 
       # TODO: make this use an actual logger
       def log_worker(message)
-        puts "resque-pool-worker[#{Process.pid}]: #{message}"
+        puts "[#{Time.now}] resque-pool-worker[#{Process.pid}]: #{message}"
         #$stdout.fsync
       end
 
